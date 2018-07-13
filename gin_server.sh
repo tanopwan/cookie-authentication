@@ -1,0 +1,1 @@
+env REDIS_HOST=localhost REDIS_PORT=6379 PG_HOST=localhost PG_DATABASE=postgres PG_USER=user PG_PASSWORD=password go run gin-server/main.go
