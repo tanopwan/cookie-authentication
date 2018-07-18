@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
 	"io"
+	"log"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -37,7 +37,7 @@ func (s *authService) CreateSession() *Session {
 	defer db.Close()
 
 	key := hashSHA256(prefix + generateRandomString(128))
-	fmt.Printf("create new session: %s\n", key)
+	log.Printf("create new session: %s\n", key)
 	_, err := db.Do("SETEX", key, int64(24*time.Hour/time.Second), 0)
 	if err != nil {
 		panic(err)
@@ -50,7 +50,7 @@ func (s *authService) CreateSession() *Session {
 }
 
 func (s *authService) GetSession(hashID string) *Session {
-	fmt.Printf("get existing session: %s\n", hashID)
+	log.Printf("get existing session: %s\n", hashID)
 	db := s.redisPool.Get()
 	defer db.Close()
 

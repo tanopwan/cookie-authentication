@@ -1,12 +1,19 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/tanopwan/coco-server/src/server"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags)
+	server.RegisterService("cookie-authentication", struct{}{})
+}
 
 // Session ... will keep track of user openning morroc website
 type Session struct {
@@ -47,7 +54,6 @@ func DefaultConfig(redisPool *redis.Pool) Config {
 
 // NewGinDefaultMiddleware ...
 func NewGinDefaultMiddleware(config Config) gin.HandlerFunc {
-
 	generateHTTPCookie := func(sessionID string) *http.Cookie {
 		return &http.Cookie{
 			Name:     config.CookieHeader,
