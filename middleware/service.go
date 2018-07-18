@@ -7,12 +7,10 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gin-gonic/gin"
-	"github.com/tanopwan/coco-server/src/server"
 )
 
 func init() {
 	log.SetFlags(log.LstdFlags)
-	server.RegisterService("cookie-authentication", struct{}{})
 }
 
 // Session ... will keep track of user openning morroc website
