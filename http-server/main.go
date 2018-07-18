@@ -69,10 +69,11 @@ func main() {
 		Addr: ":8080",
 	}
 
-	http.HandleFunc("/api-auth/session", middleware.NewHTTPDefaultMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	m := middleware.NewHTTPDefaultMiddleware(config)
+	http.Handle("/api-auth/session", m(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Hello http.Server"))
-	}, config))
+	})))
 
 	go func() {
 		err := server.ListenAndServe()

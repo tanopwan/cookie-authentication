@@ -99,9 +99,11 @@ func NewGinDefaultMiddleware(config Config) gin.HandlerFunc {
 	}
 }
 
-// NewHTTPDefaultMiddleware ...
-func NewHTTPDefaultMiddleware(f http.HandlerFunc, config Config) http.HandlerFunc {
+// Middleware ... function that excepts handler and return handler
+type Middleware func(http.Handler) http.Handler
 
+// NewHTTPDefaultMiddleware ...
+func NewHTTPDefaultMiddleware(config Config) Middleware {
 	generateHTTPCookie := func(sessionID string) *http.Cookie {
 		return &http.Cookie{
 			Name:     config.CookieHeader,
@@ -115,34 +117,37 @@ func NewHTTPDefaultMiddleware(f http.HandlerFunc, config Config) http.HandlerFun
 	}
 
 	authService := NewAuthService(config.RedisPool)
-	return func(w http.ResponseWriter, r *http.Request) {
-		hashID, err := r.Cookie(config.CookieHeader)
+	return Middleware(func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		var sess *Session
-		if err == http.ErrNoCookie {
-			// Create empty session
-			sess = authService.CreateSession()
+			hashID, err := r.Cookie(config.CookieHeader)
+
+			var sess *Session
+			if err == http.ErrNoCookie {
+				// Create empty session
+				sess = authService.CreateSession()
+				http.SetCookie(w, generateHTTPCookie(sess.ID))
+
+				h.ServeHTTP(w, r)
+				return
+			}
+
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+
+			sess = authService.GetSession(hashID.Value)
 			http.SetCookie(w, generateHTTPCookie(sess.ID))
 
-			f(w, r)
-			return
-		}
-
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		sess = authService.GetSession(hashID.Value)
-		http.SetCookie(w, generateHTTPCookie(sess.ID))
-
-		valid := config.ValidateUserFunc(sess.UserID)
-		if valid {
-			f(w, r)
-		} else {
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-	}
+			valid := config.ValidateUserFunc(sess.UserID)
+			if valid {
+				h.ServeHTTP(w, r)
+			} else {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+		})
+	})
 }
