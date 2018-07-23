@@ -39,7 +39,7 @@ func (s *authService) CreateSession() *Session {
 
 	key := hashSHA256(prefix + generateRandomString(128))
 	log.Printf("[cookie-auth] create new session: %s\n", key)
-	_, err := db.Do("SETEX", key, int64(24*time.Hour/time.Second), 0)
+	_, err := db.Do("SETEX", key, int64(24*time.Hour/time.Second), "")
 	if err != nil {
 		panic(err)
 	}

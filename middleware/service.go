@@ -157,23 +157,33 @@ func NewHTTPDefaultMiddleware(config Config) Middleware {
 				return
 			}
 
+			if hashID.Value == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+
 			sess = authService.GetSession(hashID.Value)
 
 			valid := config.ValidateUserFunc(sess.UserID)
 
-			if valid {
-				http.SetCookie(w, generateHTTPCookie(sess.ID))
-				h.ServeHTTP(w, r)
-
-				if userID := w.Header().Get("userID"); userID != "" {
-					sess = authService.CreateLoginSession(userID)
-					http.SetCookie(w, generateHTTPCookie(sess.ID))
-					w.WriteHeader(http.StatusOK)
-				}
-			} else {
+			if !valid {
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
+
+			http.SetCookie(w, generateHTTPCookie(sess.ID))
+			h.ServeHTTP(w, r)
+
+			if userID := w.Header().Get("X-USER-ID"); userID != "" {
+				log.Println("[middleware] rotate session on login")
+				w.Header().Del("X-User-Id")
+				sess = authService.CreateLoginSession(userID)
+				http.SetCookie(w, generateHTTPCookie(sess.ID))
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			log.Println("[middleware] using existing session")
 		})
 	})
 }
