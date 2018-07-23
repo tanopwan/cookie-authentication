@@ -50,6 +50,8 @@ func DefaultConfig(redisPool *redis.Pool) Config {
 	}
 }
 
+var globalConfig Config
+
 // NewGinDefaultMiddleware ...
 func NewGinDefaultMiddleware(config Config) gin.HandlerFunc {
 	generateHTTPCookie := func(sessionID string) *http.Cookie {
@@ -102,9 +104,8 @@ func NewGinDefaultMiddleware(config Config) gin.HandlerFunc {
 // Middleware ... function that excepts handler and return handler
 type Middleware func(http.Handler) http.Handler
 
-// NewHTTPDefaultMiddleware ...
-func NewHTTPDefaultMiddleware(config Config) Middleware {
-	generateHTTPCookie := func(sessionID string) *http.Cookie {
+func getGenerateHTTPCookieFunc(config Config) func(sessionID string) *http.Cookie {
+	return func(sessionID string) *http.Cookie {
 		return &http.Cookie{
 			Name:     config.CookieHeader,
 			Value:    sessionID,
@@ -115,11 +116,29 @@ func NewHTTPDefaultMiddleware(config Config) Middleware {
 			Secure:   config.CookieSecure,
 		}
 	}
+}
 
+// GenerateHTTPCookieGlobalConfig ...
+func GenerateHTTPCookieGlobalConfig(sessionID string) *http.Cookie {
+	return &http.Cookie{
+		Name:     globalConfig.CookieHeader,
+		Value:    sessionID,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   int(globalConfig.CookieMaxAge),
+		Domain:   globalConfig.CookieDomain,
+		Secure:   globalConfig.CookieSecure,
+	}
+}
+
+// NewHTTPDefaultMiddleware ...
+func NewHTTPDefaultMiddleware(config Config) Middleware {
+
+	globalConfig = config
+	generateHTTPCookie := getGenerateHTTPCookieFunc(config)
 	authService := NewAuthService(config.RedisPool)
 	return Middleware(func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 			hashID, err := r.Cookie(config.CookieHeader)
 
 			var sess *Session
@@ -139,11 +158,18 @@ func NewHTTPDefaultMiddleware(config Config) Middleware {
 			}
 
 			sess = authService.GetSession(hashID.Value)
-			http.SetCookie(w, generateHTTPCookie(sess.ID))
 
 			valid := config.ValidateUserFunc(sess.UserID)
+
 			if valid {
+				http.SetCookie(w, generateHTTPCookie(sess.ID))
 				h.ServeHTTP(w, r)
+
+				if userID := w.Header().Get("userID"); userID != "" {
+					sess = authService.CreateLoginSession(userID)
+					http.SetCookie(w, generateHTTPCookie(sess.ID))
+					w.WriteHeader(http.StatusOK)
+				}
 			} else {
 				w.WriteHeader(http.StatusForbidden)
 				return
